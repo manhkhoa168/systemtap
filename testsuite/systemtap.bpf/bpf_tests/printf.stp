@@ -1,0 +1,26 @@
+global x
+
+@define test_print
+%(
+  printf("abcd%d2", x)
+  printf("%d4%d%d", x + 2, y + 4, z + 3)
+%)
+
+probe begin {
+  printf("BEGIN")
+  x = 1; y = 1; z = 3
+  @test_print
+}
+
+probe kernel.function("vfs_read") {
+  y = 1; z = 3
+  @test_print
+  exit()
+}
+
+
+probe end {
+  y = 1; z = 3
+  @test_print
+  printf("END\n")
+}

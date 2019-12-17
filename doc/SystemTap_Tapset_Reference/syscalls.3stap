@@ -1,0 +1,35 @@
+." -*- nroff -*-
+.TH TAPSET::SYSCALLS 3stap "October 2018" "Systemtap Tapset Reference"
+.SH NAME
+tapset::syscalls \- systemtap syscall tapset
+
+.SH DESCRIPTION
+Following is an overview of available syscall probes and
+convenience variables they offer. By default, each syscall probe has name and
+argstr convenience variables, which are not included in the overview in order
+to keep it short. Non dwarf-based nd_syscall probes are supposed to have the
+same convenience variables. 
+.TP
+.P
+.TP
+.P
+.TP
+.B syscall.clone
+child_tid_uaddr, clone_flags, parent_tid_uaddr, stack_start
+.P
+.TP
+.B syscall.ni_syscall
+
+.P
+.TP
+.B syscall.rt_sigreturn
+
+.P
+.TP
+.B syscall.sigreturn
+
+
+.SH SEE ALSO
+.BR
+.IR \%stap (1),
+.IR \%stapprobes (3stap)

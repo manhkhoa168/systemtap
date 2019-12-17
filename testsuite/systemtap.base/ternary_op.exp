@@ -1,0 +1,149 @@
+set test "ternary_op"
+set testpath "$srcdir/$subdir"
+
+if {! [installtest_p]} { untested "$test"; return }
+
+# --- TEST 1 ---
+
+set subtest1 "TEST 1: ternary operator should be tighter than ,"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest1 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_1.stp'" out stderr]
+
+    set exp_out "positive 3
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
+
+# --- TEST 2 ---
+
+set subtest2 "TEST 2: ternary operator should be tighter than = (bad case)"
+set test_name "$test: $subtest2"
+
+set exit_code [run_cmd_2way "stap '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+set exp_out ""
+is "${test_name}: stdout" $out $exp_out
+isnt "${test_name}: exit code" $exit_code 0
+
+set stderr_pat "^semantic error: Expecting lvalue for assignment: operator '=' at \[^\\n\]*?\\.stp:4:58
+        source:     printf\\(\"a = %d, b = %d, c = %d\\\\n\", a > 0 \\? b = 4 : c = 5, b, c\\);
+                                                                         \\^
+"
+like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+
+# --- TEST 3 ---
+
+set subtest3 "TEST 3: ternary operator should be tighter than = (bad case, compatible 4.0)"
+set test_name "$test: $subtest3"
+
+set exit_code [run_cmd_2way "stap --compatible 4.0 '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+set exp_out ""
+is "${test_name}: stdout" $out $exp_out
+isnt "${test_name}: exit code" $exit_code 0
+
+set stderr_pat "^semantic error: Expecting lvalue for assignment: operator '=' at \[^\\n\]*?\\.stp:4:58
+        source:     printf\\(\"a = %d, b = %d, c = %d\\\\n\", a > 0 \\? b = 4 : c = 5, b, c\\);
+                                                                         \\^
+"
+like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+
+# --- TEST 4 ---
+
+set subtest4 "TEST 4: ternary operator should be tighter than = (bad case, compatible 3.3)"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest4 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --compatible 3.3 --runtime=$runtime '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+    set exp_out "a = 4, b = 4, c = 0
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
+
+# --- TEST 5 ---
+
+set subtest5 "TEST 5: ternary operator should be tighter than = (bad case, compatible 3.2)"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest5 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --compatible 3.2 --runtime=$runtime '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+    set exp_out "a = 4, b = 4, c = 0
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
+
+# --- TEST 6 ---
+
+set subtest6 "TEST 6: ternary operator should be tighter than = (good case, with parens)"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest6 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_6.stp'" out stderr]
+
+    set exp_out "3
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    set stderr_pat "^WARNING: Eliding assignment to 'b': operator '=' at \[^\\n\]*?\\.stp:3:30
+.*?
+WARNING: Eliding assignment to 'c': operator '=' at :3:39
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-lineanchor"
+
+    is "${test_name}: exit code" $exit_code 0
+}
+
+# --- TEST 7 ---
+
+set subtest7 "TEST 7: nested ternary operators"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest7 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_7.stp'" out stderr]
+
+    set exp_out "3
+4
+6
+5
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}

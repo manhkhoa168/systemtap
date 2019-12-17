@@ -1,0 +1,11 @@
+[Unit]
+Description=Export metrics from designated systemtap scripts to Prometheus.
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/stap-exporter
+ExecStart=/usr/sbin/stap-exporter $PORT $KEEPALIVE $SCRIPTS $OPTIONS
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+Alias=stap-exporter.service

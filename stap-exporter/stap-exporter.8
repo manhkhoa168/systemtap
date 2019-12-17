@@ -1,0 +1,178 @@
+.\" -*- nroff -*-
+.TH STAP-EXPORTER 8
+.SH NAME
+stap-exporter \- systemtap-prometheus interoperation mechanism
+
+.\" macros
+.de SAMPLE
+
+.nr oldin \\n(.i
+.br
+.RS
+.nf
+.nh
+..
+.de ESAMPLE
+.hy
+.fi
+.RE
+.in \\n[oldin]u
+
+..
+
+
+.SH SYNOPSIS
+
+.br
+.B stap-exporter
+[
+.I OPTIONS
+]
+
+.SH DESCRIPTION
+
+.I stap-exporter
+runs a set of systemtap scripts and relays their procfs outputs to
+remote HTTP clients on demand.  This makes systemtap scripts directly
+usable as individual prometheus exporters.  This is assisted by a
+set of macros provided in the \fBprometheus.stpm\fR tapset file.
+
+.SH OPTIONS
+
+The
+.I stap-exporter
+program supports the following options.
+.TP
+.B \-p \-\-port PORT
+Listen to the specified TCP port for HTTP requests. Port 9900 is used by default. 
+.TP
+.B \-k \-\-keepalive KEEPALIVE
+Scripts that run longer than KEEPALIVE seconds beyond the last request are shut down.
+There is no timeout by default, so once started, scripts are kept running.
+.TP
+.B \-s \-\-scripts SCRIPTS
+Search the directory SCRIPTS for \fB*.stp\fR files to be exposed.  The default is
+given in the \fBstappaths.7\fR man page.
+
+.TP
+.B \-h \-\-help
+Print help message.
+
+
+.SH OPERATION
+
+Upon startup,
+.I stap-exporter
+searches the directory specified by the \fB\-s\fR directory for files
+named \fB*.stp\fR.  The name of each file becomes available as a URL
+component for subsequent GET HTTP requests.  For example, when an HTTP
+client asks for \fB/foo.stp\fR, and the \fBfoo.stp\fR script (executable /
+shell-script) was known, then it is spawned with additional \fIstap\fR
+options to set a module name.  This predictable module name makes it
+possible for stap-exporter to transcribe a procfs file from that
+running script to HTTP clients.
+
+After a configurable period of disuse (\fB\-k\fR or
+\fB\-\-keepalive\fR option), a systemtap script is terminated.  It
+will be restarted again if a client requests.
+
+All files whose name includes the substring \fBautostart\fR are
+started immediately (and restarted if they stop), rather than
+on-demand.  These are excluded from keepalive considerations.  Scripts
+that may be too slow to start or wish to report long-term statistics
+are candidates for this treatment.
+
+.SH EXAMPLE
+
+Suppose that \fBexample.stp\fR contains the following script.  It counts
+read syscalls on a per-thread & per-cpu basis.
+
+.SAMPLE
+global arr%
+
+probe syscall.read {
+    arr[tid(), cpu()]++
+}
+
+probe prometheus {
+    @prometheus_dump_array2(arr, "count", "tid", "cpu")
+}
+.ESAMPLE
+
+The \fIprometheus_dump_array\fR macros are used to produce metrics from an array.
+Systemtap provides a \fIprometheus_dump_arrayN\fR macro for all N from 1 to 8.
+The first argument of the macros represents an array with N-element keys.
+The second argument represents the name of the metric. The remaining N arguments
+represent the names of the metric's labels.
+
+One may launch stap\-exporter as root, or equivalent \fIstapdev\fR privileges, then
+after a brief delay, use any web client to fetch data:
+
+.SAMPLE
+# stap-exporter -p 9999 -k 60 -c . &
+
+$ curl http://localhost:9999/example.stp
+Refresh page to access metrics.  [...]
+
+$ curl http://localhost:9999/example.stp
+count{tid="12614",cpu="0"} 9
+count{tid="12170",cpu="3"} 107
+count{tid="1802",cpu="0"} 33687
+count{tid="12617",cpu="1"} 99
+[...]
+.ESAMPLE
+
+The same URL may be added to a Prometheus server's scrape_config section,
+or a Performance Co-Pilot pmdaprometheus config.d directory, to collect
+this data into a monitoring system.
+
+
+.SH SAFETY AND SECURITY
+
+The stap\-exporter server does not enforce any particular security mechanisms.
+Therefore, deployment in an untrusted environment needs to consider:
+
+.TP
+script selection
+Since systemtap scripts are run under the privileges
+of the stap\-exporter process (probably \fIroot\fR), the system
+administrator must select only safe & robust scripts.
+Check the scripts installed by default before activating the
+service.
+Scripts cannot take input from the web clients.
+
+.TP
+TCP/IP firewalling
+Since stap\-exporter exposes the selected TCP/HTTP port to all interfaces
+on the host, it may be necessary to add a firewall.  It is unlikely to be
+appropriate to expose such a service to an untrusted network.
+
+.TP
+HTTP filtering
+Since stap\-exporter exposes the configured systemtap scripts to all HTTP
+clients without authentication, it may be necessary to protect it from
+abuse even on mostly trusted networks.  An HTTP proxy may be used to
+impose URL- or client- or usage- or authentication-dependent filters.
+
+.TP
+HTTPS
+Since stap\-exporter speaks only plain HTTP, an HTTP proxy may be used to
+support HTTPS secure protocols.
+
+
+.SH SEE ALSO
+.IR stap (1),
+.IR stapprobes (3stap),
+.IR stappaths (7)
+.IR tapset::prometheus (7)
+
+.SH BUGS
+Use the Bugzilla link of the project web page or our mailing list.
+.nh
+.BR http://sourceware.org/systemtap/ ", " <systemtap@sourceware.org> .
+.hy
+.PP
+.IR error::reporting (7stap),
+.nh
+.BR https://sourceware.org/systemtap/wiki/HowToReportBugs
+.hy

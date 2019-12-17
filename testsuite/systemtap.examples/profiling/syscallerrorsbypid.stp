@@ -1,0 +1,39 @@
+#! /usr/bin/env stap
+#
+# Copyright (C) 2018 Red Hat, Inc.
+# By William Cohen, Red Hat Inc.
+# wcohen@redhat.com
+#
+# USAGE: stap syscallerrorsbypid.stp --suppress-handler-errors
+#
+# The "--suppress-handler-errors" option allows the script to continue
+# run when probes are skipped.  The probe skips make the data less accurate,
+# but are otherwise harmless.
+
+global arr%[20000], sys%[20000]
+global procname%
+      
+probe syscall_any {
+  sys[tid()] = syscall_nr
+}
+probe syscall_any.return {
+    if (tid() in sys && retval < 0 ) {
+       arr[pid(), sys[tid()], retval]++
+       procname[pid()] = execname()
+    }
+    delete sys[tid()]
+}
+
+probe scheduler.process_exit {
+  delete arr[pid(),*,*]
+  delete procname[pid()]
+}
+
+function process_name(pid) {
+  return sprintf("%s[%d]", procname[pid], pid)
+}
+
+probe prometheus {
+    @prometheus_dump_array3_map(arr, "syscall_error_count", "pid", "syscall", "error",
+				sprint, process_name, syscall_name, errno_str)
+}

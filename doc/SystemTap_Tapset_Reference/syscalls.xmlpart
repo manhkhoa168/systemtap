@@ -1,0 +1,48 @@
+
+  <chapter id="syscalls">
+    <title>syscalls</title>
+    <para>
+Following is an overview of available syscall probes and
+convenience variables they offer. By default, each syscall probe has name and
+argstr convenience variables, which are not included in the overview in order
+to keep it short. Non dwarf-based nd_syscall probes are supposed to have the
+same convenience variables. 
+    </para>
+    <para>
+    <table frame='all'><title>Syscalls list</title>
+    <tgroup cols='2' align='left' colsep='1' rowsep='1'>
+    <colspec colname='c1' colwidth='1.5in' />
+    <colspec colname='c2' colwidth='5in' />
+    <thead>
+    <row>
+      <entry>syscall</entry>
+      <entry>params</entry>
+    </row>
+    </thead>
+    <tbody>
+<row><entry>
+    clone
+</entry><entry>
+    child_tid_uaddr, clone_flags, parent_tid_uaddr, stack_start
+</entry></row>
+<row><entry>
+    ni_syscall
+</entry><entry>
+    
+</entry></row>
+<row><entry>
+    rt_sigreturn
+</entry><entry>
+    
+</entry></row>
+<row><entry>
+    sigreturn
+</entry><entry>
+    
+</entry></row>
+
+    </tbody>
+    </tgroup>
+    </table>
+    </para>
+  </chapter>

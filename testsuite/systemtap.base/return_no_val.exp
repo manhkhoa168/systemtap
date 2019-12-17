@@ -1,0 +1,405 @@
+set test "return_no_val"
+set testpath "$srcdir/$subdir"
+
+if {! [installtest_p]} { untested "$test"; return }
+
+# --- TEST 1 ---
+
+set subtest1 "TEST 1: return no value in void type func (in the middle)"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest1 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_1.stp'" out stderr]
+
+    set exp_out "enter f
+exit
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    set stderr_pat "\\AWARNING: statement will never be reached: identifier 'println' at \[^\\n\]*?\\.stp:4:5
+ source:     println\\(\"leave f\"\\);
+             \\^
+\\Z"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop"
+
+    is "${test_name}: exit code" $exit_code 0
+}
+
+# --- TEST 2 ---
+
+set subtest2 "TEST 2: return no value in void type func (at the end, no-op)"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest2 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+    set exp_out "enter f
+leave f
+exit
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    set exp_stderr ""
+    is "${test_name}: stderr" $stderr $exp_stderr
+
+    is "${test_name}: exit code" $exit_code 0
+}
+
+# --- TEST 3 ---
+
+set subtest3 "TEST 3: return nothing in long type func (inferred by another return stmt)"
+set test_name "$test: $subtest3"
+
+set exit_code [run_cmd_2way "stap '$srcdir/$subdir/${test}_3.stp'" out stderr]
+
+set exp_out ""
+is "${test_name}: stdout" $out $exp_out
+isnt "${test_name}: exit code" $exit_code 0
+
+set stderr_pat "\\Asemantic error: type mismatch \\(unknown\\): keyword at \[^\\n\]*?\\.stp:3:9
+        source:         return;
+                        \\^
+
+semantic error: type was first inferred here \\(long\\): number '1' at :5:12
+        source:     return 1;
+                           \\^
+"
+like "${test_name}: stderr" $stderr $stderr_pat "-linestop"
+
+# --- TEST 4 ---
+
+set subtest4 "TEST 4: return nothing in long type func (inferred by caller)"
+set test_name "$test: $subtest4"
+
+set exit_code [run_cmd_2way "stap '$srcdir/$subdir/${test}_4.stp'" out stderr]
+
+set exp_out ""
+is "${test_name}: stdout" $out $exp_out
+isnt "${test_name}: exit code" $exit_code 0
+
+set stderr_pat "\\Asemantic error: type mismatch \\(unknown\\): keyword at \[^\\n\]*?\\.stp:3:9
+        source:         return;
+                        \\^
+
+semantic error: type was first inferred here \\(long\\): identifier 'f' at :8:17
+        source:     println\\(1 \\+ f\\(3\\)\\)
+                                \\^
+
+"
+like "${test_name}: stderr" $stderr $stderr_pat "-linestop"
+
+# --- TEST 5 ---
+
+set subtest5 "TEST 5: pretty-printer adds a semicolon (two return stmts in a row)"
+set test_name "$test: $subtest5"
+
+set exit_code [run_cmd_2way "stap -p1 '$srcdir/$subdir/${test}_5.stp'" out stderr]
+
+set out_pat "^return;\\nreturn;\\n"
+like "${test_name}: stdout" $out $out_pat "-linestop -lineanchor"
+
+is "${test_name}: exit code" $exit_code 0
+if {$stderr ne ""} {
+    send_log "stderr:\n$stderr"
+}
+
+# --- TEST 6 ---
+
+set subtest6 "TEST 6: pretty-printer adds a semicolon (under if)"
+set test_name "$test: $subtest6"
+
+set exit_code [run_cmd_2way "stap -p1 '$srcdir/$subdir/${test}_6.stp'" out stderr]
+
+set out_pat "^if \\(1\\) return
+;
+"
+like "${test_name}: stdout" $out $out_pat "-linestop -lineanchor"
+
+is "${test_name}: exit code" $exit_code 0
+if {$stderr ne ""} {
+    send_log "stderr:\n$stderr"
+}
+
+# --- TEST 7 ---
+
+set subtest7 "TEST 7: pretty-printer adds a semicolon (under for)"
+set test_name "$test: $subtest7"
+
+set exit_code [run_cmd_2way "stap -p1 '$srcdir/$subdir/${test}_7.stp'" out stderr]
+
+set out_pat "^for \\(; 1; \\) return;
+"
+like "${test_name}: stdout" $out $out_pat "-linestop -lineanchor"
+
+is "${test_name}: exit code" $exit_code 0
+if {$stderr ne ""} {
+    send_log "stderr:\n$stderr"
+}
+
+# --- TEST 8 ---
+
+set subtest8 "TEST 8: pretty-printer adds a semicolon (under while)"
+set test_name "$test: $subtest8"
+
+set exit_code [run_cmd_2way "stap -p1 '$srcdir/$subdir/${test}_8.stp'" out stderr]
+
+set out_pat "^for \\(; 1; \\) return;
+"
+like "${test_name}: stdout" $out $out_pat "-linestop -lineanchor"
+
+is "${test_name}: exit code" $exit_code 0
+if {$stderr ne ""} {
+    send_log "stderr:\n$stderr"
+}
+
+# --- TEST 9 ---
+
+set subtest9 "TEST 9: pretty-printer adds a semicolon (under foreach)"
+set test_name "$test: $subtest9"
+
+set exit_code [run_cmd_2way "stap -p1 '$srcdir/$subdir/${test}_9.stp'" out stderr]
+
+set out_pat "^foreach \\(\\\[k\\\] in a\\) return;
+"
+like "${test_name}: stdout" $out $out_pat "-linestop -lineanchor"
+
+is "${test_name}: exit code" $exit_code 0
+if {$stderr ne ""} {
+    send_log "stderr:\n$stderr"
+}
+
+# --- TEST 10 ---
+
+set subtest10 "TEST 10: 'return' right before 'if'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest10 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_10.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:4:5
+     source:     if \\(1\\) \\\{
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 11 ---
+
+set subtest11 "TEST 11: 'return' right before 'for'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest11 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_11.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:4:5
+     source:     for \\(;;\\) \\\{
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 12 ---
+
+set subtest12 "TEST 12: 'return' right before 'while'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest12 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_12.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:4:5
+     source:     while \\(1\\) \\\{
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 13 ---
+
+set subtest13 "TEST 13: 'return' right before 'foreach'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest13 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_13.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:6:5
+     source:     foreach \\(k in a\\) \\\{
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 14 ---
+
+set subtest14 "TEST 14: 'return' right before 'return'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest14 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_14.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:4:5
+     source:     return
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 15 ---
+
+set subtest15 "TEST 15: 'return' right before 'next'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest15 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_15.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:4:5
+     source:     next
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 16 ---
+
+set subtest16 "TEST 16: 'return' right before 'delete'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest16 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_16.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:6:5
+     source:     delete a
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 17 ---
+
+set subtest17 "TEST 17: 'return' right before 'try'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest17 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_17.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:6:5
+     source:     try \\\{
+                 \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 18 ---
+
+set subtest18 "TEST 18: 'return' right before 'break'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest18 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_18.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:5:9
+     source:         break
+                     \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}
+
+# --- TEST 19 ---
+
+set subtest19 "TEST 19: 'return' right before 'continue'"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest19 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_19.stp'" out stderr]
+
+    set exp_out ""
+    is "${test_name}: stdout" $out $exp_out
+    isnt "${test_name}: exit code" $exit_code 0
+
+    set stderr_pat "^parse error: expected literal string or number
+        saw: keyword at \[^\\n\]*?\\.stp:5:9
+     source:         continue
+                     \\^
+"
+    like "${test_name}: stderr" $stderr $stderr_pat "-linestop -lineanchor"
+}

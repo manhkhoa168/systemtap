@@ -1,0 +1,25 @@
+#! /usr/bin/env stap
+
+global reads, writes, total_io
+
+probe vfs.read.return {
+    reads[execname()] <<< bytes_read
+    total_io[execname()] <<< bytes_read
+}
+
+probe vfs.write.return {
+    writes[execname()] <<< bytes_written
+    total_io[execname()] <<< bytes_written
+}
+
+# print top 10 IO processes every 5 seconds
+probe timer.s(5) {
+    printf ("%16s\t%10s\t%10s\n", "Process", "KB Read", "KB Written")
+    foreach (name in total_io @sum- limit 10)
+        printf("%16s\t%10d\t%10d\n", name,
+               @sum(reads[name])/1024, @sum(writes[name])/1024)
+    delete reads
+    delete writes
+    delete total_io
+    print("\n")
+}

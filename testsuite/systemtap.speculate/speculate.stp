@@ -1,0 +1,66 @@
+#! stap -p4
+
+# test to exercise the speculative.stp tapset
+# shows file operations for a file that later had a read or write problem.
+
+global file_desc
+global tid_filename%, tid_fd%, tid_buf%, tid_count%
+
+probe syscall.open,  syscall.openat
+{
+  if (pid() != target()) next
+  tid_filename[tid()] = filename
+}
+
+probe syscall.open.return,  syscall.openat.return
+{
+  if (pid() != target()) next
+  file_desc[retval] = speculation()
+  speculate(file_desc[retval], sprintf("open(%s) = %d\n",
+              tid_filename[tid()], retval))
+}
+
+probe syscall.close
+{
+  if (pid() != target()) next
+  tid_fd[tid()] = fd
+}
+
+probe syscall.close.return
+{
+  if (pid() != target()) next
+  fd = tid_fd[tid()]
+  if (! (fd in file_desc)) next
+
+  if (retval < 0)
+    commit(file_desc[fd])
+  else
+    discard(file_desc[fd])
+  delete file_desc[fd]
+}
+
+probe syscall.read, syscall.write
+{
+  if (pid() != target()) next
+  tid_fd[tid()] = fd
+  tid_buf[tid()] = buf_uaddr
+  tid_count[tid()] = count
+}
+
+probe syscall.read.return {
+  if (pid() != target()) next
+  if (! (tid_fd[tid()] in file_desc)) next
+
+  speculate(file_desc[tid_fd[tid()]], sprintf("read(%d, %p, %d) = %d\n",
+            tid_fd[tid()], tid_buf[tid()], tid_count[tid()], retval))
+  if (retval < 0) commit(file_desc[tid_fd[tid()]])
+}
+
+probe syscall.write.return {
+  if (pid() != target()) next
+  if (! (tid_fd[tid()] in file_desc)) next
+
+  speculate(file_desc[tid_fd[pid()]], sprintf("write(%d, %p, %d) = %d\n",
+            tid_fd[tid()], tid_buf[tid()], tid_count[tid()], retval))
+  if (retval < 0) commit(file_desc[tid_fd[tid()]])
+}

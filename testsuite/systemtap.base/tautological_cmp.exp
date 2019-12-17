@@ -1,0 +1,46 @@
+set test "tautological_cmp"
+set testpath "$srcdir/$subdir"
+
+if {! [installtest_p]} { untested "$test"; return }
+
+# --- TEST 1 ---
+
+set subtest1 "TEST 1: q == q"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest1 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap -e 'probe begin \{ a = 32; println (a == a); exit() \}' --runtime=$runtime" out stderr]
+
+    set exp_out "1
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+
+    set no_stderr_pat "-W(?:error=)?tautological-compare\\y"
+    unlike "${test_name}: stderr" $stderr $no_stderr_pat "-linestop"
+}
+
+# --- TEST 2 ---
+
+set subtest2 "TEST 2: q != q"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest2 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap -e 'probe begin \{ a = 32; println (a != a); exit() \}' --runtime=$runtime" out stderr]
+
+    set exp_out "0
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+
+    set no_stderr_pat "-W(?:error=)?tautological-compare\\y"
+    unlike "${test_name}: stderr" $stderr $no_stderr_pat "-linestop"
+}

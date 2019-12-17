@@ -1,0 +1,6 @@
+#  -*- Mode: rpm-spec; indent-tabs-mode: nil -*- */
+#
+# RPM macros for packages installing systemtap tapset files
+
+%_systemtap_tapsetdir @pkgdatadir@/tapset
+%_systemtap_datadir @pkgdatadir@

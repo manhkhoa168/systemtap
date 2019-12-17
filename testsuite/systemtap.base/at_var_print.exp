@@ -1,0 +1,62 @@
+set test "at_var_print"
+set testpath "$srcdir/$subdir"
+
+if {! [installtest_p]} { untested "$test"; return }
+if {! [uretprobes_p]} { untested "$test"; return }
+
+# --- TEST 1 ---
+
+set subtest1 "TEST 1: atvar_op::print() output the module arg properly."
+
+set res [target_compile ${testpath}/${test}_1.c ./a.out executable \
+    "additional_flags=-O additional_flags=-g"]
+if {$res ne ""} {
+    verbose "target_compile failed: $res" 2
+    fail "$test: $subtest1: unable to compile ${test}_1.c"
+} else {
+    set stp_fh [open "$srcdir/$subdir/${test}_1.stp" r]
+    set stp_src [read $stp_fh]
+    close $stp_fh
+
+    set cwd [pwd]
+    regsub -all -- {\$\^PWD\y} $stp_src $cwd stp_src
+
+    set stp_fh [open "./${test}_1.stp" w+]
+    puts -nonewline $stp_fh $stp_src
+    close $stp_fh
+
+    set test_name "$test: $subtest1"
+
+    set exit_code [run_cmd_2way "stap -p1 -c ./a.out './${test}_1.stp'" out stderr]
+
+    set out_pat "\\yreturn \\@var\\(\"v\", \"\[^\\n\"\]+/a\\.out\"\\);"
+    like "${test_name}: stdout" $out $out_pat "-lineanchor"
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
+
+# --- TEST 2 ---
+
+set subtest2 "TEST 2: atvar_op::print() does not output the module arg if there is none"
+
+set res [target_compile ${testpath}/${test}_1.c ./a.out executable \
+    "additional_flags=-O additional_flags=-g"]
+if {$res ne ""} {
+    verbose "target_compile failed: $res" 2
+    fail "$test: $subtest2: unable to compile ${test}_1.c"
+} else {
+    set test_name "$test: $subtest2"
+
+    set exit_code [run_cmd_2way "stap -p1 -c ./a.out '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+    set out_pat "\\yprintln\\(\\@var\\(\"v\"\\)\\);"
+    like "${test_name}: stdout" $out $out_pat "-lineanchor"
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}

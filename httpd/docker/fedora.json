@@ -1,0 +1,33 @@
+{
+    "distro_name" : "fedora",
+    "distro_package_format" : "rpm",
+    "distro_package_manager" : "dnf",
+    "distro_package_installer" : "fedora_install_package.py",
+    "docker_stages" : {
+	"header" : [
+	    "FROM fedora:${DVER}",
+	    "MAINTAINER http://sourceware.org/systemtap/",
+	    "",
+	    "# Notes for the RUN command:",
+	    "# - We're using 'install_weak_deps=False' so that any weak",
+	    "#   dependencies (i.e. 'Suggests: pkgfoo') will not get",
+	    "#   pulled in. This keeps the resulting image a bit smaller.",
+	    "# - We're installing 'dnf-plugins-core' to get 'dnf",
+	    "#   debuginfo-install' (which is used when installing",
+	    "#   packages).",
+	    "",
+	    "RUN `# Install our dependencies, etc.`                  && \\",
+	    "     dnf --setopt=install_weak_deps=False -y install       \\",
+	    "        dnf-plugins-core systemtap-devel python wget       \\",
+	    "        createrepo_c",
+	    "COPY fedora_install_package.py /tmp/"
+	],
+	"install" : [
+	    "RUN python /tmp/fedora_install_package.py --name ${NAME} --pkg ${PKG} --build_id ${BUILD_ID}"
+	],
+	"footer" : [
+	    "RUN `# Clean up`                                        && \\",
+	    "     dnf -y clean all"
+	]
+    }
+}

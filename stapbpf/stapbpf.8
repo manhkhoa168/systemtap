@@ -1,0 +1,174 @@
+.\" -*- nroff -*-
+.TH STAPBPF 8 
+.SH NAME
+stapbpf \- systemtap bpf runtime
+
+.\" macros
+.de SAMPLE
+
+.nr oldin \\n(.i
+.br
+.RS
+.nf
+.nh
+..
+.de ESAMPLE
+.hy
+.fi
+.RE
+.in \\n[oldin]u
+
+..
+
+
+.SH SYNOPSIS
+
+.br
+.B stapbpf
+[
+.I OPTIONS
+]
+.I MODULE
+
+.SH DESCRIPTION
+
+The
+.I stapbpf
+program is the BPF back-end of the Systemtap tool.  It expects a 
+bpf-elf file produced by the front-end
+.I stap
+tool, when run with
+.IR \-\-runtime=bpf .
+
+.PP
+Splitting the systemtap tool into a front-end and a back-end allows a
+user to compile a systemtap script on a development machine that has
+the debugging information needed to compile the script and then
+transfer the resulting shared object to a production machine that
+doesn't have any development tools or debugging information installed.
+.PP
+Please refer to
+.IR stappaths (7)
+for the version number, or run
+.PP
+\& $ rpm \-q systemtap # (for Fedora/RHEL)
+.br
+\& $ apt\-get \-v systemtap # (for Ubuntu)
+
+.SH OPTIONS
+The
+.I stapbpf
+program supports the following options.  Any other option
+prints a list of supported options.
+.TP
+.B \-v
+Verbose mode.
+.TP
+.B \-V
+Print version number and exit.
+.TP
+.B \-w
+Suppress warnings from the script.
+.TP
+.B \-h
+Print help message.
+.TP
+.B \-o FILE
+Send output to FILE.
+
+.SH ARGUMENTS
+.B MODULE
+is the path of a bpf-elf file produced by the front-end
+.I stap
+tool, when run with
+.IR \-\-runtime=bpf .
+
+.SH EXAMPLES
+Here is a very basic example of how to generate a
+.IR stapbpf
+module.
+First, use
+.I stap
+to compile a script.  The
+.I stap
+program will report the name of the resulting module in the current
+working directory.
+.PP
+\& $ stap \-\-runtime=bpf \-p4 \-e \[aq]probe begin { printf("Hello World!\\n"); exit() }\[aq]
+.br
+\& stap_28784.bo
+.PP
+Run
+.I stapbpf
+with the pathname to the module as an argument.
+.PP
+\& $ stapbpf ./stap_28784.bo
+.br
+\& Hello World!
+.PP
+If the
+.I \-p4
+option is omitted,
+.I stap
+will invoke
+.I stapbpf
+automatically.
+
+.SH LIMITATIONS
+This runtime is in an early stage of development and it currently lacks
+support for a number of features available in the default runtime.
+A subset of the following probe points is supported:
+
+.SAMPLE
+begin
+end
+kernel.*
+process.*
+timer.*
+perf.*
+.ESAMPLE
+
+In general, probes based on the kprobes, uprobes, tracepoint and perf
+infrastructures are supported. See
+.IR stapprobes (3stap)
+for more information on the probe points and which tracing infrastructures
+they are based on.
+
+.B for
+loops,
+.B foreach
+loops and
+.B while
+loops are usable only in 
+.B begin
+and
+.B end
+probes. 
+.B try
+statements are not supported. There is limited support for string
+operations. String variables and literals are limited to
+64 characters, except for
+.B printf
+format strings, which are limited to 256 characters. Additionally,
+.B printf
+is limited to no more than 3 format specifiers and the name
+of the bpf-elf file produced by the front-end 
+.I stap
+tool should not be changed.
+
+.SH SAFETY AND SECURITY
+See the 
+.IR stap (1)
+manual page for additional information on safety and security.
+
+.SH SEE ALSO
+.IR stap (1),
+.IR stapprobes (3stap),
+.IR staprun (8),
+.IR stapex (3stap)
+
+.SH BUGS
+Use the Bugzilla link of the project web page or our mailing list.
+.nh
+.BR http://sourceware.org/systemtap/ ", " <systemtap@sourceware.org> .
+.hy

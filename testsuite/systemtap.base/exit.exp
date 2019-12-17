@@ -1,0 +1,74 @@
+set test "exit"
+set testpath "$srcdir/$subdir"
+
+if {! [installtest_p]} { untested "$test"; return }
+
+# --- TEST 1 ---
+
+set subtest1 "TEST 1: exit() in the middle of a func body"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest1 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_1.stp'" out stderr]
+
+    set exp_out "enter f
+leave f
+exit
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
+
+# --- TEST 2 ---
+
+set subtest2 "TEST 2: exit() in the middle of a func body in a deeper func call chain"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest2 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_2.stp'" out stderr]
+
+    set exp_out "enter g
+enter f
+leave f
+leave g
+exit
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
+
+# --- TEST 3 ---
+
+set subtest3 "TEST 3: exit() in the middle of a probe handler body"
+foreach runtime [get_runtime_list] {
+    if {$runtime eq ""} {
+        set runtime "kernel"
+    }
+    set test_name "$test: $subtest3 ($runtime)"
+
+    set exit_code [run_cmd_2way "stap --runtime=$runtime '$srcdir/$subdir/${test}_3.stp'" out stderr]
+
+    set exp_out "enter probe
+leave probe
+"
+    is "${test_name}: stdout" $out $exp_out
+
+    is "${test_name}: exit code" $exit_code 0
+    if {$stderr ne ""} {
+        send_log "stderr:\n$stderr"
+    }
+}
